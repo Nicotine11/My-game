@@ -2,27 +2,46 @@ using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using static Bullet;
 
+/// <summary>
+/// Класс Enemy представляет врага в игре.
+/// Враги могут получать урон, погибать и возвращаться в пул объектов для оптимизации памяти.
+/// Реализует интерфейс IDamageable для получения урона от пуль.
+/// </summary>
 public class Enemy : MonoBehaviour, IDamageable
 {
     [Header("Здоровье")]
-    [SerializeField] private float maxHealth = 30f;
-    private float currentHealth;
+    [SerializeField] private float maxHealth = 30f; // максимальное здоровье врага
+    private float currentHealth; // текущее здоровье врага
 
     [Header("Дроп бонусов")]
-    [SerializeField] private DropTable dropTable; // ScriptableObject с шансами дропа
+    [SerializeField] private DropTable dropTable; // ScriptableObject с таблицей бонусов (шансы дропа оружия)
 
-    private EnemySpawner spawner; // ссылка на спавнер, чтобы вернуться в пул
+    private EnemySpawner spawner; // ссылка на спавнер, чтобы вернуть врага в пул после смерти
 
+    /// <summary>
+    /// Устанавливает ссылку на спавнер, который создал этого врага.
+    /// Нужна для возврата врага в пул вместо удаления.
+    /// </summary>
+    /// <param name="ownerSpawner">Спавнер, который управляет этим врагом</param>
     public void SetSpawner(EnemySpawner ownerSpawner)
     {
         spawner = ownerSpawner;
     }
 
+    /// <summary>
+    /// OnEnable вызывается при активации объекта (когда его вытягивают из пула).
+    /// Восстанавливаем здоровье врага до максимума для переиспользования.
+    /// </summary>
     private void OnEnable()
     {
-        currentHealth = maxHealth; // на случай, если враг тоже будет из пула
+        currentHealth = maxHealth; // на случай, если враг будет переиспользован из пула
     }
 
+    /// <summary>
+    /// Получить урон от пули (реализация интерфейса IDamageable).
+    /// Проверяет, не убили ли врага, и если да - вызывает Die().
+    /// </summary>
+    /// <param name="amount">Количество урона, которое наносится врагу</param>
     public void TakeDamage(float amount)
     {
         currentHealth -= amount;
@@ -31,68 +50,34 @@ public class Enemy : MonoBehaviour, IDamageable
             Die();
     }
 
+    /// <summary>
+    /// Враг погибает.
+    /// Спауним бонус согласно DropTable, затем возвращаем врага в пул или удаляем.
+    /// </summary>
     private void Die()
     {
+        // Пробуем спаунить случайный бонус (оружие или что-то другое)
         dropTable?.TrySpawnDrop(transform.position);
 
+        // Если враг был создан спавнером - возвращаем его в пул
+        // Если враг был размещён вручную на сцене - удаляем его
         if (spawner != null)
             spawner.ReturnEnemy(gameObject);
         else
-            Destroy(gameObject); // на случай если враг размещён на сцене вручную, без спавнера
+            Destroy(gameObject);
     }
 
-    // Если враг сталкивается с вертолётом напрямую (не пулей) - тоже можно нанести урон игроку
+    /// <summary>
+    /// Коллизия с вертолётом (игроком) - враг может нанести урон игроку.
+    /// Пока реализация не готова (комментарий: обсудим отдельно).
+    /// </summary>
+    /// <param name="other">Объект, с которым произошла коллизия</param>
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("Player"))
         {
-            // урон игроку - обсудим отдельно
+            // TODO: Реализовать урон игроку при столкновении с врагом
+            // Здесь должен быть код для нанесения урона вертолёту
         }
     }
 }
-
-
-/*Старый код
-using UnityEngine;
-
-public class Enemy : MonoBehaviour
-{
-    [Header("Настройки врага")]
-    [SerializeField] private int health = 1;           // Здоровье
-    [SerializeField] private float scrollSpeed = 3f;   // Скорость движения вниз
-    [SerializeField] private int scoreValue = 10;      // Очки за уничтожение
-
-    void Update()
-    {
-        // Движение вниз
-        transform.Translate(Vector3.down * scrollSpeed * Time.deltaTime);
-
-        // Уничтожить, если улетел за экран
-        if (transform.position.y < -6f)
-        {
-            Destroy(gameObject);
-        }
-    }
-
-    public void TakeDamage(int damage)
-    {
-        health -= damage;
-
-        if (health <= 0)
-        {
-            Die();
-        }
-    }
-
-    void Die()
-    {
-        // Добавляем очки (позже реализуем менеджер счёта)
-        Debug.Log($"Враг уничтожен! +{scoreValue} очков");
-
-        // Эффект взрыва (опционально)
-        // Instantiate(explosionPrefab, transform.position, Quaternion.identity);
-
-        Destroy(gameObject);
-    }
-}
-*/
